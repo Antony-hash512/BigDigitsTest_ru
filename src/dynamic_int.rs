@@ -330,4 +330,77 @@ impl DynamicInt {
             }
         }
     }
+
+    // Вычисление факториала
+    pub fn factorial(&self) -> Self {
+        let zero = DynamicInt::new(0);
+        let one = DynamicInt::one();
+        
+        // 0! = 1, 1! = 1
+        if self.eq(&zero) || self.eq(&one) {
+            return one;
+        }
+        
+        let mut result = one.clone();
+        let mut current = DynamicInt::new(2);
+        
+        while current.lt(self) || current.eq(self) {
+            result = result.mul(&current);
+            current = current.add(&one);
+        }
+        
+        result
+    }
+
+    // Статический метод для вычисления факториала от числа
+    pub fn factorial_of(n: i128) -> Self {
+        let num = DynamicInt::new(n);
+        num.factorial()
+    }
+
+    // Проверка, является ли число факториалом некоторого числа
+    pub fn is_factorial(&self) -> (bool, i128) {
+        let one = DynamicInt::one();
+        let mut n = DynamicInt::new(1);
+        let mut factorial = one.clone();
+        
+        loop {
+            if factorial.eq(self) {
+                return (true, match n {
+                    DynamicInt::Small(val) => val - 1,
+                    DynamicInt::Big(_) => -1, // Слишком большое число
+                });
+            }
+            
+            if factorial.lt(self) {
+                factorial = factorial.mul(&n);
+                n = n.add(&one);
+                
+                // Ограничиваем поиск разумными пределами
+                if let DynamicInt::Small(val) = n {
+                    if val > 200 {
+                        break;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+        
+        (false, -1)
+    }
+
+    // Вычисление факториала в диапазоне (для многопоточности)
+    pub fn factorial_range(start: i128, end: i128) -> Self {
+        let mut result = DynamicInt::one();
+        let mut current = DynamicInt::new(start);
+        let end_num = DynamicInt::new(end);
+        
+        while current.lt(&end_num) || current.eq(&end_num) {
+            result = result.mul(&current);
+            current = current.add(&DynamicInt::one());
+        }
+        
+        result
+    }
 } 

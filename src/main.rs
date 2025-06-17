@@ -27,8 +27,13 @@ fn main() {
         println!("12. 🚀 Многопоточный поиск по формуле Евклида");
         println!("13. ♾️  Бесконечный поиск по формуле Евклида");
         println!("14. ⚡ Бесконечный многопоточный поиск по Евклиду");
-        println!("15. 🚪 Выход");
-        println!("\nВведите номер (1-15): ");
+        println!("15. 🧮 Вычисление факториала");
+        println!("16. 🔍 Поиск чисел-факториалов в диапазоне");
+        println!("17. 🚀 Многопоточное вычисление факториалов");
+        println!("18. ♾️  Бесконечное вычисление факториалов");
+        println!("19. ⚡ Бесконечное многопоточное вычисление факториалов");
+        println!("20. 🚪 Выход");
+        println!("\nВведите номер (1-20): ");
         
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Не удалось прочитать ввод");
@@ -258,6 +263,96 @@ fn main() {
                 }
             }
             "15" => {
+                println!("\n🧮 Вычисление факториала конкретного числа:");
+                
+                print!("Введите число для вычисления факториала: ");
+                io::stdout().flush().unwrap();
+                let mut num_input = String::new();
+                io::stdin().read_line(&mut num_input).expect("Ошибка чтения");
+                let num: i128 = num_input.trim().parse().unwrap_or(10);
+                
+                calculate_factorial(num);
+            }
+            "16" => {
+                println!("\n🔍 Поиск чисел-факториалов в диапазоне:");
+                
+                print!("Начальное число: ");
+                io::stdout().flush().unwrap();
+                let mut start_input = String::new();
+                io::stdin().read_line(&mut start_input).expect("Ошибка чтения");
+                let start_num: i128 = start_input.trim().parse().unwrap_or(1);
+                
+                print!("Конечное число: ");
+                io::stdout().flush().unwrap();
+                let mut end_input = String::new();
+                io::stdin().read_line(&mut end_input).expect("Ошибка чтения");
+                let end_num: i128 = end_input.trim().parse().unwrap_or(1000000);
+                
+                search_factorials_in_range(start_num, end_num);
+            }
+            "17" => {
+                println!("\n🧵 Настройка многопоточного вычисления факториалов:");
+                
+                let available_cores = thread::available_parallelism().map(|p| p.get()).unwrap_or(4);
+                println!("💻 Доступно логических ядер: {}", available_cores);
+                
+                print!("Введите количество потоков (по умолчанию {}): ", available_cores);
+                io::stdout().flush().unwrap();
+                let mut threads_input = String::new();
+                io::stdin().read_line(&mut threads_input).expect("Ошибка чтения");
+                let num_threads = threads_input.trim().parse().unwrap_or(available_cores);
+                
+                print!("Начальное число: ");
+                io::stdout().flush().unwrap();
+                let mut start_input = String::new();
+                io::stdin().read_line(&mut start_input).expect("Ошибка чтения");
+                let start_num: i128 = start_input.trim().parse().unwrap_or(10);
+                
+                print!("Конечное число: ");
+                io::stdout().flush().unwrap();
+                let mut end_input = String::new();
+                io::stdin().read_line(&mut end_input).expect("Ошибка чтения");
+                let end_num: i128 = end_input.trim().parse().unwrap_or(20);
+                
+                println!("\n🚀 Запускаем многопоточное вычисление факториалов...");
+                calculate_factorials_multithreaded(num_threads, start_num, end_num);
+            }
+            "18" => {
+                println!("\n⚠️  Внимание! Бесконечное вычисление факториалов может работать очень долго!");
+                print!("Вы уверены? (y/N): ");
+                io::stdout().flush().unwrap();
+                let mut confirm = String::new();
+                io::stdin().read_line(&mut confirm).expect("Ошибка чтения");
+                
+                if confirm.trim().to_lowercase() == "y" || confirm.trim().to_lowercase() == "yes" {
+                    calculate_factorials_infinite();
+                } else {
+                    println!("❌ Отменено.");
+                }
+            }
+            "19" => {
+                println!("\n⚠️  Внимание! Бесконечное многопоточное вычисление факториалов может работать очень долго!");
+                print!("Вы уверены? (y/N): ");
+                io::stdout().flush().unwrap();
+                let mut confirm = String::new();
+                io::stdin().read_line(&mut confirm).expect("Ошибка чтения");
+                
+                if confirm.trim().to_lowercase() == "y" || confirm.trim().to_lowercase() == "yes" {
+                    let available_cores = thread::available_parallelism().map(|p| p.get()).unwrap_or(4);
+                    println!("💻 Доступно логических ядер: {}", available_cores);
+                    
+                    print!("Введите количество потоков (по умолчанию {}): ", available_cores);
+                    io::stdout().flush().unwrap();
+                    let mut threads_input = String::new();
+                    io::stdin().read_line(&mut threads_input).expect("Ошибка чтения");
+                    let num_threads = threads_input.trim().parse().unwrap_or(available_cores);
+                    
+                    calculate_factorials_infinite_multithreaded(num_threads);
+                } else {
+                    println!("❌ Отменено.");
+                }
+            }
+            "20" => {
                 println!("👋 До свидания!");
                 break;
             }
@@ -737,6 +832,458 @@ fn infinite_search_thread(
         
         println!("🏁 Поток #{} завершил диапазон {}-{}, переходит к следующему", 
             thread_id, start, end);
+    }
+}
+
+#[derive(Debug)]
+enum FactorialThreadMessage {
+    FactorialCalculated {
+        thread_id: usize,
+        number: i128,
+        factorial: String,
+        type_name: String,
+        calculation_time: std::time::Duration,
+        decimal_length: usize,
+    },
+    FactorialFound {
+        thread_id: usize,
+        number: String,
+        factorial_of: i128,
+        type_name: String,
+        check_time: std::time::Duration,
+    },
+    Progress {
+        thread_id: usize,
+        current_number: i128,
+        checked_count: usize,
+    },
+}
+
+// Вычисление факториала конкретного числа
+fn calculate_factorial(n: i128) {
+    println!("🧮 Вычисляем {}!...\n", n);
+    
+    if n < 0 {
+        println!("❌ Ошибка: факториал определен только для неотрицательных чисел!");
+        return;
+    }
+    
+    if n > 1000 {
+        println!("⚠️  Внимание: вычисление факториала для n > 1000 может занять очень много времени!");
+        print!("Продолжить? (y/N): ");
+        io::stdout().flush().unwrap();
+        let mut confirm = String::new();
+        io::stdin().read_line(&mut confirm).expect("Ошибка чтения");
+        
+        if !(confirm.trim().to_lowercase() == "y" || confirm.trim().to_lowercase() == "yes") {
+            println!("❌ Отменено.");
+            return;
+        }
+    }
+    
+    let start_time = Instant::now();
+    let factorial = DynamicInt::factorial_of(n);
+    let calculation_time = start_time.elapsed();
+    
+    let decimal_length = factorial.to_string_value().len();
+    
+    println!("🎉 РЕЗУЛЬТАТ ВЫЧИСЛЕНИЯ ФАКТОРИАЛА:");
+    println!("   📊 Число: {}", n);
+    println!("   🧮 Факториал {}!: {}", n, factorial.to_string_value());
+    println!("   🔢 Тип результата: {}", factorial.get_type_name());
+    println!("   📐 Длина в десятичных знаках: {}", decimal_length);
+    println!("   ⏱️  Время вычисления: {:.3?}", calculation_time);
+    
+    // Дополнительная информация
+    if decimal_length > 100 {
+        println!("   💡 Первые 50 цифр: {}...", &factorial.to_string_value()[..50]);
+        println!("   💡 Последние 50 цифр: ...{}", &factorial.to_string_value()[decimal_length-50..]);
+    }
+    
+    println!("\n📊 Статистика:");
+    if calculation_time.as_secs_f64() > 0.001 {
+        let ops_per_sec = n as f64 / calculation_time.as_secs_f64();
+        println!("   ⚡ Производительность: {:.0} операций/сек", ops_per_sec);
+    }
+}
+
+// Поиск чисел-факториалов в диапазоне
+fn search_factorials_in_range(start: i128, end: i128) {
+    println!("🔍 Ищем числа-факториалы в диапазоне от {} до {}...\n", start, end);
+    
+    let mut current = DynamicInt::new(start);
+    let one = DynamicInt::one();
+    let end_num = DynamicInt::new(end);
+    let mut found_count = 0;
+    let mut checked_count = 0;
+    let total_start_time = Instant::now();
+    
+    while current.lt(&end_num) {
+        let start_time = Instant::now();
+        let (is_factorial, factorial_of) = current.is_factorial();
+        let elapsed = start_time.elapsed();
+        
+        if is_factorial {
+            found_count += 1;
+            
+            println!("🎉 НАЙДЕНО ЧИСЛО-ФАКТОРИАЛ №{}!", found_count);
+            println!("   📊 Число: {}", current.to_string_value());
+            println!("   🧮 Это факториал: {}! = {}", factorial_of, current.to_string_value());
+            println!("   🔢 Тип: {}", current.get_type_name());
+            println!("   ⏱️  Время проверки: {:.3?}", elapsed);
+            println!("   📍 Позиция в диапазоне: {}/{}\n", 
+                current.to_string_value(), end);
+        }
+        
+        checked_count += 1;
+        current = current.add(&one);
+        
+        // Для информативности выводим прогресс каждые 100000 чисел
+        if checked_count % 100000 == 0 {
+            let progress = (checked_count as f64 / (end - start) as f64) * 100.0;
+            let speed = checked_count as f64 / total_start_time.elapsed().as_secs_f64();
+            println!("🔄 Проверено: {} чисел ({:.1}%) | Скорость: {:.0}/сек", 
+                checked_count, progress, speed);
+        }
+    }
+    
+    let total_elapsed = total_start_time.elapsed();
+    println!("\n📊 Итоги поиска:");
+    println!("   🔢 Диапазон: {} - {}", start, end);
+    println!("   ✅ Найдено чисел-факториалов: {}", found_count);
+    println!("   📋 Всего проверено: {}", checked_count);
+    println!("   ⏱️  Общее время: {:.2?}", total_elapsed);
+    println!("   ⚡ Скорость: {:.0} чисел/сек", 
+        checked_count as f64 / total_elapsed.as_secs_f64());
+}
+
+// Многопоточное вычисление факториалов
+fn calculate_factorials_multithreaded(num_threads: usize, start_num: i128, end_num: i128) {
+    println!("🚀 Начинаем многопоточное вычисление факториалов...");
+    println!("   🧵 Количество потоков: {}", num_threads);
+    println!("   📊 Диапазон: {} - {}", start_num, end_num);
+    println!("   ⚠️  Нажмите Ctrl+C для остановки\n");
+    
+    let calculated_count = Arc::new(AtomicUsize::new(0));
+    let (tx, rx) = mpsc::channel();
+    let start_time = Instant::now();
+    
+    // Создаем потоки
+    let mut handles = Vec::new();
+    let numbers_per_thread = (end_num - start_num + 1) / num_threads as i128;
+    
+    for thread_id in 0..num_threads {
+        let tx_clone = tx.clone();
+        let calculated_count_clone = Arc::clone(&calculated_count);
+        let thread_start = start_num + (thread_id as i128 * numbers_per_thread);
+        let thread_end = if thread_id == num_threads - 1 {
+            end_num
+        } else {
+            thread_start + numbers_per_thread - 1
+        };
+        
+        let handle = thread::spawn(move || {
+            calculate_factorials_thread(
+                thread_id,
+                thread_start,
+                thread_end,
+                tx_clone,
+                calculated_count_clone,
+            );
+        });
+        
+        handles.push(handle);
+    }
+    
+    // Закрываем отправитель в основном потоке
+    drop(tx);
+    
+    let calculated_count_for_msg = Arc::clone(&calculated_count);
+    
+    // Собираем результаты
+    let msg_handle = thread::spawn(move || {
+        for result in rx {
+            match result {
+                FactorialThreadMessage::FactorialCalculated { 
+                    thread_id, number, factorial, type_name, calculation_time, decimal_length 
+                } => {
+                    let global_calculated = calculated_count_for_msg.fetch_add(1, Ordering::SeqCst) + 1;
+                    let elapsed_total = start_time.elapsed();
+                    
+                    println!("🎉 ВЫЧИСЛЕН ФАКТОРИАЛ №{}!", global_calculated);
+                    println!("   📊 Число: {}", number);
+                    println!("   🧮 Факториал: {}", if decimal_length > 100 { 
+                        format!("{}...{} ({} цифр)", 
+                            &factorial[..50], 
+                            &factorial[decimal_length-50..], 
+                            decimal_length)
+                    } else { 
+                        factorial 
+                    });
+                    println!("   🔢 Тип: {}", type_name);
+                    println!("   🧵 Поток: #{}", thread_id);
+                    println!("   ⏱️  Время вычисления: {:.3?}", calculation_time);
+                    println!("   📐 Длина: {} цифр", decimal_length);
+                    println!("   ⏰ Общее время работы: {:.2?}\n", elapsed_total);
+                }
+                FactorialThreadMessage::Progress { thread_id, current_number, checked_count } => {
+                    if checked_count % 5 == 0 {
+                        let total_calculated = calculated_count_for_msg.load(Ordering::SeqCst);
+                        let elapsed = start_time.elapsed();
+                        let speed = total_calculated as f64 / elapsed.as_secs_f64();
+                        println!("🔄 Поток #{}: вычисляется {}! | Всего: {} | Скорость: {:.2}/сек", 
+                            thread_id, current_number, total_calculated, speed);
+                    }
+                }
+                _ => {}
+            }
+        }
+    });
+    
+    // Ждем завершения всех потоков
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    
+    // Ждем завершения потока обработки сообщений
+    msg_handle.join().unwrap();
+    
+    let total_time = start_time.elapsed();
+    let total_calculated_final = calculated_count.load(Ordering::SeqCst);
+    
+    println!("\n📊 Итоговая статистика многопоточного вычисления:");
+    println!("   🧵 Потоков: {}", num_threads);
+    println!("   📊 Диапазон: {} - {}", start_num, end_num);
+    println!("   ✅ Вычислено факториалов: {}", total_calculated_final);
+    println!("   ⏱️  Общее время: {:.2?}", total_time);
+    println!("   ⚡ Общая скорость: {:.2} факториалов/сек", 
+        total_calculated_final as f64 / total_time.as_secs_f64());
+}
+
+fn calculate_factorials_thread(
+    thread_id: usize,
+    start: i128,
+    end: i128,
+    tx: mpsc::Sender<FactorialThreadMessage>,
+    calculated_count: Arc<AtomicUsize>,
+) {
+    let mut checked_in_thread = 0;
+    
+    for n in start..=end {
+        let calculation_start = Instant::now();
+        let factorial = DynamicInt::factorial_of(n);
+        let calculation_time = calculation_start.elapsed();
+        
+        let decimal_length = factorial.to_string_value().len();
+        
+        checked_in_thread += 1;
+        calculated_count.fetch_add(1, Ordering::SeqCst);
+        
+        let _ = tx.send(FactorialThreadMessage::FactorialCalculated {
+            thread_id,
+            number: n,
+            factorial: factorial.to_string_value(),
+            type_name: factorial.get_type_name().to_string(),
+            calculation_time,
+            decimal_length,
+        });
+        
+        // Отправляем прогресс
+        let _ = tx.send(FactorialThreadMessage::Progress {
+            thread_id,
+            current_number: n,
+            checked_count: checked_in_thread,
+        });
+    }
+    
+    println!("🏁 Поток #{} завершен. Вычислено {} факториалов в диапазоне {}-{}", 
+        thread_id, checked_in_thread, start, end);
+}
+
+// Бесконечное вычисление факториалов
+fn calculate_factorials_infinite() {
+    println!("♾️  Начинаем бесконечное вычисление факториалов...");
+    println!("   🔢 Начинаем с 1! и идём до бесконечности");
+    println!("   ⚠️  Нажмите Ctrl+C для остановки\n");
+    
+    let mut n = 1_i128;
+    let mut calculated_count = 0;
+    let start_time = Instant::now();
+    
+    loop {
+        let calculation_start = Instant::now();
+        let factorial = DynamicInt::factorial_of(n);
+        let calculation_time = calculation_start.elapsed();
+        
+        calculated_count += 1;
+        let decimal_length = factorial.to_string_value().len();
+        
+        println!("🎉 ВЫЧИСЛЕН ФАКТОРИАЛ №{}!", calculated_count);
+        println!("   📊 Число: {}", n);
+        println!("   🧮 Факториал {}!: {}", n, if decimal_length > 100 { 
+            format!("{}...{} ({} цифр)", 
+                &factorial.to_string_value()[..50], 
+                &factorial.to_string_value()[decimal_length-50..], 
+                decimal_length)
+        } else { 
+            factorial.to_string_value() 
+        });
+        println!("   🔢 Тип: {}", factorial.get_type_name());
+        println!("   ⏱️  Время вычисления: {:.3?}", calculation_time);
+        println!("   📐 Длина: {} цифр", decimal_length);
+        
+        let total_elapsed = start_time.elapsed();
+        println!("   ⏰ Общее время работы: {:.2?}", total_elapsed);
+        println!("   📍 Всего вычислено: {}\n", calculated_count);
+        
+        n += 1;
+        
+        // Проверяем переполнение
+        if n <= 0 {
+            println!("⚠️  Достигнуто максимальное значение i128!");
+            break;
+        }
+    }
+}
+
+// Бесконечное многопоточное вычисление факториалов
+fn calculate_factorials_infinite_multithreaded(num_threads: usize) {
+    println!("♾️  Начинаем бесконечное многопоточное вычисление факториалов...");
+    println!("   🧵 Количество потоков: {}", num_threads);
+    println!("   📦 Размер блока на поток: 100 чисел");
+    println!("   ⚠️  Нажмите Ctrl+C для остановки\n");
+    
+    let calculated_count = Arc::new(AtomicUsize::new(0));
+    let current_n = Arc::new(AtomicUsize::new(1)); // Начинаем с 1
+    let (tx, rx) = mpsc::channel();
+    let start_time = Instant::now();
+    
+    // Создаем потоки
+    let mut handles = Vec::new();
+    
+    for thread_id in 0..num_threads {
+        let tx_clone = tx.clone();
+        let calculated_count_clone = Arc::clone(&calculated_count);
+        let current_n_clone = Arc::clone(&current_n);
+        
+        let handle = thread::spawn(move || {
+            infinite_factorial_calculation_thread(
+                thread_id,
+                tx_clone,
+                calculated_count_clone,
+                current_n_clone,
+            );
+        });
+        
+        handles.push(handle);
+    }
+    
+    // Закрываем отправитель в основном потоке
+    drop(tx);
+    
+    let calculated_count_for_msg = Arc::clone(&calculated_count);
+    
+    // Собираем результаты
+    let msg_handle = thread::spawn(move || {
+        for result in rx {
+            match result {
+                FactorialThreadMessage::FactorialCalculated { 
+                    thread_id, number, factorial, type_name, calculation_time, decimal_length 
+                } => {
+                    let global_calculated = calculated_count_for_msg.fetch_add(1, Ordering::SeqCst) + 1;
+                    let elapsed_total = start_time.elapsed();
+                    
+                    println!("🎉 ВЫЧИСЛЕН ФАКТОРИАЛ №{}!", global_calculated);
+                    println!("   📊 Число: {}", number);
+                    println!("   🧮 Факториал: {}", if decimal_length > 100 { 
+                        format!("{}...{} ({} цифр)", 
+                            &factorial[..50], 
+                            &factorial[decimal_length-50..], 
+                            decimal_length)
+                    } else { 
+                        factorial 
+                    });
+                    println!("   🔢 Тип: {}", type_name);
+                    println!("   🧵 Поток: #{}", thread_id);
+                    println!("   ⏱️  Время вычисления: {:.3?}", calculation_time);
+                    println!("   📐 Длина: {} цифр", decimal_length);
+                    println!("   ⏰ Общее время работы: {:.2?}\n", elapsed_total);
+                }
+                FactorialThreadMessage::Progress { thread_id, current_number, checked_count } => {
+                    if checked_count % 10 == 0 {
+                        let total_calculated = calculated_count_for_msg.load(Ordering::SeqCst);
+                        let elapsed = start_time.elapsed();
+                        let speed = total_calculated as f64 / elapsed.as_secs_f64();
+                        println!("🔄 Поток #{}: вычисляется {}! | Всего: {} | Скорость: {:.2}/сек", 
+                            thread_id, current_number, total_calculated, speed);
+                    }
+                }
+                _ => {}
+            }
+        }
+    });
+    
+    // Ждем завершения всех потоков (никогда не случится в бесконечном режиме)
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    
+    // Ждем завершения потока обработки сообщений
+    msg_handle.join().unwrap();
+}
+
+fn infinite_factorial_calculation_thread(
+    thread_id: usize,
+    tx: mpsc::Sender<FactorialThreadMessage>,
+    calculated_count: Arc<AtomicUsize>,
+    current_n: Arc<AtomicUsize>,
+) {
+    let chunk_size = 100_i128; // 100 факториалов на блок
+    let mut checked_in_thread = 0;
+    
+    loop {
+        // Атомарно получаем следующий диапазон
+        let start_n = current_n.fetch_add(chunk_size as usize, Ordering::SeqCst) as i128;
+        let end_n = start_n + chunk_size;
+        
+        // Проверяем на переполнение
+        if start_n <= 0 || start_n >= i128::MAX - chunk_size {
+            println!("⚠️  Поток #{} достиг максимального значения i128", thread_id);
+            break;
+        }
+        
+        println!("🧵 Поток #{} начинает вычисление факториалов {}-{}", 
+            thread_id, start_n, end_n - 1);
+        
+        for n in start_n..end_n {
+            let calculation_start = Instant::now();
+            let factorial = DynamicInt::factorial_of(n);
+            let calculation_time = calculation_start.elapsed();
+            
+            checked_in_thread += 1;
+            calculated_count.fetch_add(1, Ordering::SeqCst);
+            
+            let decimal_length = factorial.to_string_value().len();
+            
+            let _ = tx.send(FactorialThreadMessage::FactorialCalculated {
+                thread_id,
+                number: n,
+                factorial: factorial.to_string_value(),
+                type_name: factorial.get_type_name().to_string(),
+                calculation_time,
+                decimal_length,
+            });
+            
+            // Отправляем прогресс
+            let _ = tx.send(FactorialThreadMessage::Progress {
+                thread_id,
+                current_number: n,
+                checked_count: checked_in_thread,
+            });
+        }
+        
+        println!("🏁 Поток #{} завершил диапазон {}-{}, переходит к следующему", 
+            thread_id, start_n, end_n - 1);
     }
 }
 
