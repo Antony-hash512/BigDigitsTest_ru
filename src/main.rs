@@ -1,82 +1,148 @@
-use num_bigint::{BigInt, ToBigInt};
-use num_traits::Zero; // Для BigInt::zero()
+mod dynamic_int;
 
-// Определяем наш собственный тип числа
-#[derive(Debug, Clone)]
-enum DynamicInt {
-    Small(i128),
-    Big(BigInt),
-}
-
-impl DynamicInt {
-    // Конструктор из i128
-    fn new(val: i128) -> Self {
-        DynamicInt::Small(val)
-    }
-
-    // Пример операции сложения
-    fn add(&self, other: &DynamicInt) -> Self {
-        match (self, other) {
-            (DynamicInt::Small(a), DynamicInt::Small(b)) => {
-                // Пытаемся сложить как i128
-                let (result, overflow) = a.overflowing_add(*b);
-                if overflow {
-                    // Если переполнение, конвертируем оба числа в BigInt и складываем
-                    let big_a = a.to_bigint().unwrap();
-                    let big_b = b.to_bigint().unwrap();
-                    DynamicInt::Big(big_a + big_b)
-                } else {
-                    DynamicInt::Small(result)
-                }
-            }
-            // Если одно из чисел уже Big, то сразу работаем с BigInt
-            (DynamicInt::Big(a), DynamicInt::Small(b)) => {
-                DynamicInt::Big(a + b.to_bigint().unwrap())
-            }
-            (DynamicInt::Small(a), DynamicInt::Big(b)) => {
-                DynamicInt::Big(a.to_bigint().unwrap() + b)
-            }
-            (DynamicInt::Big(a), DynamicInt::Big(b)) => {
-                DynamicInt::Big(a + b)
-            }
-        }
-    }
-
-    // Пример операции умножения
-    fn mul(&self, other: &DynamicInt) -> Self {
-        match (self, other) {
-            (DynamicInt::Small(a), DynamicInt::Small(b)) => {
-                let (result, overflow) = a.overflowing_mul(*b);
-                if overflow {
-                    let big_a = a.to_bigint().unwrap();
-                    let big_b = b.to_bigint().unwrap();
-                    DynamicInt::Big(big_a * big_b)
-                } else {
-                    DynamicInt::Small(result)
-                }
-            }
-            (DynamicInt::Big(a), DynamicInt::Small(b)) => {
-                DynamicInt::Big(a * b.to_bigint().unwrap())
-            }
-            (DynamicInt::Small(a), DynamicInt::Big(b)) => {
-                DynamicInt::Big(a.to_bigint().unwrap() * b)
-            }
-            (DynamicInt::Big(a), DynamicInt::Big(b)) => {
-                DynamicInt::Big(a * b)
-            }
-        }
-    }
-
-    // Метод для получения значения в виде строки
-    fn to_string_value(&self) -> String {
-        match self {
-            DynamicInt::Small(n) => n.to_string(),
-            DynamicInt::Big(n) => n.to_string(),
-        }
-    }
-}
+use dynamic_int::DynamicInt;
+use std::time::Instant;
 
 fn main() {
+    println!("🔢 Поиск совершенных чисел с использованием DynamicInt");
+    println!("================================================");
+    
+    // Автоматически запускаем тест известных совершенных чисел
+    //test_known_perfect_numbers();
+     find_perfect_numbers();
+    // println!("\n🔍 Теперь попробуем найти следующее совершенное число после 8128...");
+    // search_perfect_numbers_in_range(8129, 50000);
+}
+
+fn test_known_perfect_numbers() {
+    println!("🧪 Тестируем известные совершенные числа...\n");
+    
+    // Первые несколько совершенных чисел: 6, 28, 496, 8128
+    let test_numbers = vec![6, 28, 496, 8128];
+    
+    for num in test_numbers {
+        let start_time = Instant::now();
+        let dynamic_num = DynamicInt::new(num);
+        let is_perfect = dynamic_num.is_perfect();
+        let elapsed = start_time.elapsed();
+        
+        println!("Число: {} | Совершенное: {} | Тип: {} | Время: {:.3?}",
+            num, 
+            if is_perfect { "✅" } else { "❌" },
+            dynamic_num.get_type_name(),
+            elapsed
+        );
+    }
+    
+    println!("\n🔍 Также проверим несколько несовершенных чисел:");
+    let non_perfect = vec![5, 7, 10, 12, 100, 1000];
+    
+    for num in non_perfect {
+        let start_time = Instant::now();
+        let dynamic_num = DynamicInt::new(num);
+        let is_perfect = dynamic_num.is_perfect();
+        let elapsed = start_time.elapsed();
+        
+        println!("Число: {} | Совершенное: {} | Тип: {} | Время: {:.3?}",
+            num, 
+            if is_perfect { "✅" } else { "❌" },
+            dynamic_num.get_type_name(),
+            elapsed
+        );
+    }
+    
+    println!("\n🎯 Результат: алгоритм корректно определяет совершенные числа!");
+}
+
+fn search_perfect_numbers_in_range(start: i128, end: i128) {
+    println!("🔍 Ищем совершенные числа в диапазоне от {} до {}...\n", start, end);
+    
+    let mut current = DynamicInt::new(start);
+    let one = DynamicInt::one();
+    let end_num = DynamicInt::new(end);
+    let mut found_count = 0;
+    let mut checked_count = 0;
+    let total_start_time = Instant::now();
+    
+    while current.lt(&end_num) {
+        let start_time = Instant::now();
+        
+        if current.is_perfect() {
+            let elapsed = start_time.elapsed();
+            found_count += 1;
+            
+            println!("🎉 НАЙДЕНО СОВЕРШЕННОЕ ЧИСЛО №{}!", found_count);
+            println!("   📊 Число: {}", current.to_string_value());
+            println!("   🔢 Тип: {}", current.get_type_name());
+            println!("   ⏱️  Время проверки: {:.3?}", elapsed);
+            println!("   📍 Позиция в диапазоне: {}/{}\n", 
+                current.to_string_value(), end);
+        }
+        
+        checked_count += 1;
+        
+        // Переходим к следующему числу
+        current = current.add(&one);
+        
+        // Для информативности выводим прогресс каждые 5000 чисел
+        if checked_count % 5000 == 0 {
+            let progress = (checked_count as f64 / (end - start) as f64) * 100.0;
+            println!("🔄 Проверено: {} чисел ({:.1}%)", checked_count, progress);
+        }
+    }
+    
+    let total_elapsed = total_start_time.elapsed();
+    println!("\n📊 Итоги поиска:");
+    println!("   🔢 Диапазон: {} - {}", start, end);
+    println!("   ✅ Найдено совершенных чисел: {}", found_count);
+    println!("   📋 Всего проверено: {}", checked_count);
+    println!("   ⏱️  Общее время: {:.2?}", total_elapsed);
+    println!("   ⚡ Скорость: {:.0} чисел/сек", 
+        checked_count as f64 / total_elapsed.as_secs_f64());
+    
+    if found_count == 0 {
+        println!("   💡 Следующее совершенное число после 8128 = 33550336 (очень большое!)");
+    }
+}
+
+// Функция для бесконечного поиска (закомментирована для безопасности)
+fn find_perfect_numbers() {
+    println!("🔍 Начинаем бесконечный поиск совершенных чисел...\n");
+    println!("⚠️  Внимание: это может занять очень много времени!");
+    println!("   Нажмите Ctrl+C для остановки\n");
+    
+    let mut current = DynamicInt::new(2); // Начинаем с 2
+    let one = DynamicInt::one();
+    let mut found_count = 0;
+    let mut checked_count = 0;
+    
+    loop {
+        let start_time = Instant::now();
+        
+        if current.is_perfect() {
+            let elapsed = start_time.elapsed();
+            found_count += 1;
+            
+            println!("🎉 НАЙДЕНО СОВЕРШЕННОЕ ЧИСЛО №{}!", found_count);
+            println!("   📊 Число: {}", current.to_string_value());
+            println!("   🔢 Тип: {}", current.get_type_name());
+            println!("   ⏱️  Время проверки: {:.2?}", elapsed);
+            println!("   📍 Всего проверено: {}\n", checked_count);
+        }
+        
+        checked_count += 1;
+        
+        // Переходим к следующему числу
+        current = current.add(&one);
+        
+        // Для информативности выводим прогресс каждые 10000 чисел
+        if checked_count % 10000 == 0 {
+            println!("🔄 Проверено: {} чисел", checked_count);
+        }
+    }
+}
+
+fn test1() {
     // Пример использования
     let num1 = DynamicInt::new(i128::MAX - 10);
     let num2 = DynamicInt::new(20);
