@@ -32,8 +32,9 @@ fn main() {
         println!("17. 🚀 Многопоточное вычисление факториалов");
         println!("18. ♾️  Бесконечное вычисление факториалов");
         println!("19. ⚡ Бесконечное многопоточное вычисление факториалов");
-        println!("20. 🚪 Выход");
-        println!("\nВведите номер (1-20): ");
+        println!("20. 🧮 Многопоточное вычисление одного факториала");
+        println!("21. 🚪 Выход");
+        println!("\nВведите номер (1-21): ");
         
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Не удалось прочитать ввод");
@@ -353,6 +354,40 @@ fn main() {
                 }
             }
             "20" => {
+                println!("\n🧮 Многопоточное вычисление одного факториала:");
+                
+                let available_cores = thread::available_parallelism().map(|p| p.get()).unwrap_or(4);
+                println!("💻 Доступно логических ядер: {}", available_cores);
+                
+                print!("Введите количество потоков (по умолчанию {}): ", available_cores);
+                io::stdout().flush().unwrap();
+                let mut threads_input = String::new();
+                io::stdin().read_line(&mut threads_input).expect("Ошибка чтения");
+                let num_threads = threads_input.trim().parse().unwrap_or(available_cores);
+                
+                print!("Введите число для вычисления факториала: ");
+                io::stdout().flush().unwrap();
+                let mut num_input = String::new();
+                io::stdin().read_line(&mut num_input).expect("Ошибка чтения");
+                let num: i128 = num_input.trim().parse().unwrap_or(100);
+                
+                if num > 10000 {
+                    println!("⚠️  Внимание! Вычисление факториала для n > 10000 может занять очень много времени!");
+                    print!("Продолжить? (y/N): ");
+                    io::stdout().flush().unwrap();
+                    let mut confirm = String::new();
+                    io::stdin().read_line(&mut confirm).expect("Ошибка чтения");
+                    
+                    if !(confirm.trim().to_lowercase() == "y" || confirm.trim().to_lowercase() == "yes") {
+                        println!("❌ Отменено.");
+                        continue;
+                    }
+                }
+                
+                println!("\n🚀 Запускаем многопоточное вычисление {}! с {} потоками...", num, num_threads);
+                calculate_factorial_multithreaded(num, num_threads);
+            }
+            "21" => {
                 println!("👋 До свидания!");
                 break;
             }
@@ -1830,6 +1865,196 @@ fn infinite_euclid_search_thread(
         println!("🏁 Поток #{} завершил диапазон x={}-{}, переходит к следующему", 
             thread_id, start_x, end_x - 1);
     }
+}
+
+#[derive(Debug)]
+enum SingleFactorialThreadMessage {
+    PartialResult {
+        thread_id: usize,
+        start_range: i128,
+        end_range: i128,
+        partial_product: String,
+        calculation_time: std::time::Duration,
+        decimal_length: usize,
+    },
+    Progress {
+        thread_id: usize,
+        current_progress: f64,
+    },
+}
+
+// Многопоточное вычисление одного факториала
+fn calculate_factorial_multithreaded(n: i128, num_threads: usize) {
+    println!("🧮 Многопоточное вычисление {}! с {} потоками...\n", n, num_threads);
+    
+    if n < 0 {
+        println!("❌ Ошибка: факториал определен только для неотрицательных чисел!");
+        return;
+    }
+    
+    if n <= 1 {
+        println!("🎉 РЕЗУЛЬТАТ: {}! = 1", n);
+        return;
+    }
+    
+    let start_time = Instant::now();
+    let (tx, rx) = mpsc::channel();
+    
+    // Разделяем диапазон 1..=n между потоками
+    let chunk_size = n / num_threads as i128;
+    let remainder = n % num_threads as i128;
+    
+    let mut handles = Vec::new();
+    let mut current_start = 1_i128;
+    
+    for thread_id in 0..num_threads {
+        let tx_clone = tx.clone();
+        
+        // Распределяем остаток между первыми потоками
+        let current_chunk_size = if thread_id < remainder as usize {
+            chunk_size + 1
+        } else {
+            chunk_size
+        };
+        
+        let range_start = current_start;
+        let range_end = current_start + current_chunk_size - 1;
+        current_start = range_end + 1;
+        
+        // Если диапазон пустой, пропускаем поток
+        if range_start > n {
+            break;
+        }
+        
+        let actual_end = std::cmp::min(range_end, n);
+        
+        let handle = thread::spawn(move || {
+            calculate_partial_factorial_thread(
+                thread_id,
+                range_start,
+                actual_end,
+                tx_clone,
+            );
+        });
+        
+        handles.push(handle);
+        println!("🧵 Поток #{}: диапазон {}-{} (размер: {})", 
+            thread_id, range_start, actual_end, actual_end - range_start + 1);
+    }
+    
+    drop(tx);
+    
+    // Собираем частичные результаты
+    let mut partial_results: Vec<(usize, DynamicInt, std::time::Duration)> = Vec::new();
+    
+    for result in rx {
+        match result {
+            SingleFactorialThreadMessage::PartialResult { 
+                thread_id, start_range, end_range, partial_product, calculation_time, decimal_length 
+            } => {
+                println!("✅ Поток #{} завершен: диапазон {}-{}", thread_id, start_range, end_range);
+                println!("   📐 Длина результата: {} цифр", decimal_length);
+                println!("   ⏱️  Время вычисления: {:.3?}", calculation_time);
+                
+                // Восстанавливаем DynamicInt из строки (простое решение)
+                let partial_result = if partial_product.len() > 50 {
+                    // Для больших чисел используем BigInt
+                    use num_bigint::BigInt;
+                    use std::str::FromStr;
+                    DynamicInt::Big(BigInt::from_str(&partial_product).unwrap())
+                } else {
+                    DynamicInt::new(partial_product.parse().unwrap_or(1))
+                };
+                
+                partial_results.push((thread_id, partial_result, calculation_time));
+            }
+            SingleFactorialThreadMessage::Progress { thread_id, current_progress } => {
+                println!("🔄 Поток #{}: прогресс {:.1}%", thread_id, current_progress);
+            }
+        }
+    }
+    
+    // Ждем завершения всех потоков
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    
+    println!("\n🔗 Объединяем частичные результаты...");
+    let merge_start = Instant::now();
+    
+    // Сортируем результаты по thread_id для правильного порядка умножения
+    partial_results.sort_by_key(|(thread_id, _, _)| *thread_id);
+    
+    let mut final_result = DynamicInt::one();
+    for (thread_id, partial_result, thread_time) in partial_results {
+        println!("🔗 Умножаем результат потока #{} (время потока: {:.3?})", thread_id, thread_time);
+        final_result = final_result.mul(&partial_result);
+    }
+    
+    let merge_time = merge_start.elapsed();
+    let total_time = start_time.elapsed();
+    let decimal_length = final_result.to_string_value().len();
+    
+    println!("\n🎉 РЕЗУЛЬТАТ МНОГОПОТОЧНОГО ВЫЧИСЛЕНИЯ:");
+    println!("   📊 Число: {}", n);
+    println!("   🧮 Факториал {}!: {}", n, if decimal_length > 100 { 
+        format!("{}...{} ({} цифр)", 
+            &final_result.to_string_value()[..50], 
+            &final_result.to_string_value()[decimal_length-50..], 
+            decimal_length)
+    } else { 
+        final_result.to_string_value() 
+    });
+    println!("   🔢 Тип результата: {}", final_result.get_type_name());
+    println!("   📐 Длина в десятичных знаках: {}", decimal_length);
+    println!("   🧵 Количество потоков: {}", num_threads);
+    println!("   ⏱️  Время объединения результатов: {:.3?}", merge_time);
+    println!("   ⏰ Общее время вычисления: {:.3?}", total_time);
+    
+    // Сравнение с однопоточным вычислением для небольших чисел
+    if n <= 100 {
+        println!("\n📊 Сравнение с однопоточным вычислением:");
+        let single_start = Instant::now();
+        let single_result = DynamicInt::factorial_of(n);
+        let single_time = single_start.elapsed();
+        
+        println!("   ⏱️  Однопоточное время: {:.3?}", single_time);
+        let speedup = single_time.as_secs_f64() / total_time.as_secs_f64();
+        println!("   ⚡ Ускорение: {:.2}x", speedup);
+        
+        // Проверяем корректность
+        if final_result.to_string_value() == single_result.to_string_value() {
+            println!("   ✅ Результаты совпадают!");
+        } else {
+            println!("   ❌ Ошибка: результаты не совпадают!");
+        }
+    }
+}
+
+fn calculate_partial_factorial_thread(
+    thread_id: usize,
+    start: i128,
+    end: i128,
+    tx: mpsc::Sender<SingleFactorialThreadMessage>,
+) {
+    let calculation_start = Instant::now();
+    let total_numbers = end - start + 1;
+    
+    println!("🧵 Поток #{} начал вычисление произведения {}-{} ({} чисел)", 
+        thread_id, start, end, total_numbers);
+    
+    let partial_result = DynamicInt::product_range(start, end);
+    let calculation_time = calculation_start.elapsed();
+    let decimal_length = partial_result.to_string_value().len();
+    
+    let _ = tx.send(SingleFactorialThreadMessage::PartialResult {
+        thread_id,
+        start_range: start,
+        end_range: end,
+        partial_product: partial_result.to_string_value(),
+        calculation_time,
+        decimal_length,
+    });
 }
 
 fn test_prime_numbers() {

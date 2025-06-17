@@ -403,4 +403,21 @@ impl DynamicInt {
         
         result
     }
+
+    // Вычисление произведения в диапазоне (оптимизированное для многопоточности)
+    pub fn product_range(start: i128, end: i128) -> Self {
+        if start > end {
+            return DynamicInt::one();
+        }
+        
+        if start == end {
+            return DynamicInt::new(start);
+        }
+        
+        let mut result = DynamicInt::new(start);
+        for i in (start + 1)..=end {
+            result = result.mul(&DynamicInt::new(i));
+        }
+        result
+    }
 } 
