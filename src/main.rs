@@ -1997,7 +1997,7 @@ fn calculate_factorial_multithreaded(n: i128, num_threads: usize) {
     
     println!("\n🎉 РЕЗУЛЬТАТ МНОГОПОТОЧНОГО ВЫЧИСЛЕНИЯ:");
     println!("   📊 Число: {}", n);
-    println!("   🧮 Факториал {}!: {}", n, if decimal_length > 100 { 
+    println!("   🧮 Факториал {}!: {}", n, if decimal_length > 100000000 { 
         format!("{}...{} ({} цифр)", 
             &final_result.to_string_value()[..50], 
             &final_result.to_string_value()[decimal_length-50..], 
@@ -2008,6 +2008,8 @@ fn calculate_factorial_multithreaded(n: i128, num_threads: usize) {
     println!("   🔢 Тип результата: {}", final_result.get_type_name());
     println!("   📐 Длина в десятичных знаках: {}", decimal_length);
     println!("   🧵 Количество потоков: {}", num_threads);
+    println!("   Первые 50 цифр: {}", final_result.to_string_value()[..50]);
+    println!("   Последние 50 цифр: {}", final_result.to_string_value()[decimal_length-50..]);
     println!("   ⏱️  Время объединения результатов: {:.3?}", merge_time);
     println!("   ⏰ Общее время вычисления: {:.3?}", total_time);
     
