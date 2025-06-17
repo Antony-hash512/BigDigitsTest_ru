@@ -2008,13 +2008,18 @@ fn calculate_factorial_multithreaded(n: i128, num_threads: usize) {
     println!("   🔢 Тип результата: {}", final_result.get_type_name());
     println!("   📐 Длина в десятичных знаках: {}", decimal_length);
     println!("   🧵 Количество потоков: {}", num_threads);
-    //println!("   Первые 50 цифр: {}", final_result.to_string_value()[..50]);
-    //println!("   Последние 50 цифр: {}", final_result.to_string_value()[decimal_length-50..]);
     println!("   ⏱️  Время объединения результатов: {:.3?}", merge_time);
     println!("   ⏰ Общее время вычисления: {:.3?}", total_time);
     
+     // Дополнительная информация
+    if decimal_length > 100 {
+        println!("   💡 Первые 50 цифр: {}...", &final_result.to_string_value()[..50]);
+        println!("   💡 Последние 50 цифр: ...{}", &final_result.to_string_value()[decimal_length-50..]);
+    }
+
+
     // Сравнение с однопоточным вычислением для небольших чисел
-    if n <= 100 {
+    if n <= 100000 {
         println!("\n📊 Сравнение с однопоточным вычислением:");
         let single_start = Instant::now();
         let single_result = DynamicInt::factorial_of(n);
