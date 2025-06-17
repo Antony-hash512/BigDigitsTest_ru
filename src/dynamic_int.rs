@@ -181,6 +181,56 @@ impl DynamicInt {
         sum.eq(self)
     }
 
+    // Проверка на простое число
+    pub fn is_prime(&self) -> bool {
+        let zero = DynamicInt::new(0);
+        let one = DynamicInt::one();
+        let two = DynamicInt::new(2);
+        let three = DynamicInt::new(3);
+        
+        // 0 и 1 не являются простыми
+        if self.eq(&zero) || self.eq(&one) {
+            return false;
+        }
+        
+        // 2 и 3 - простые числа
+        if self.eq(&two) || self.eq(&three) {
+            return true;
+        }
+        
+        // Четные числа больше 2 не простые
+        if self.rem(&two).is_zero() {
+            return false;
+        }
+        
+        // Числа, делящиеся на 3, не простые
+        if self.rem(&three).is_zero() {
+            return false;
+        }
+        
+        // Проверяем делители вида 6k±1 до квадратного корня
+        let mut i = DynamicInt::new(5);
+        let sqrt_n = self.sqrt();
+        let six = DynamicInt::new(6);
+        
+        while i.lt(&sqrt_n) || i.eq(&sqrt_n) {
+            // Проверяем i и i+2 (вида 6k-1 и 6k+1)
+            if self.rem(&i).is_zero() {
+                return false;
+            }
+            
+            let i_plus_2 = i.add(&two);
+            if (i_plus_2.lt(&sqrt_n) || i_plus_2.eq(&sqrt_n)) && self.rem(&i_plus_2).is_zero() {
+                return false;
+            }
+            
+            // Переходим к следующей паре (следующее 6k-1)
+            i = i.add(&six);
+        }
+        
+        true
+    }
+
     // Проверяем, является ли число типом Small или Big
     pub fn is_small(&self) -> bool {
         matches!(self, DynamicInt::Small(_))
