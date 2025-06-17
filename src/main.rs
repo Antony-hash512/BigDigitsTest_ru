@@ -17,8 +17,9 @@ fn main() {
         println!("2. 🔍 Поиск в ограниченном диапазоне");
         println!("3. 🚀 Многопоточный поиск совершенных чисел");
         println!("4. 🔄 Однопоточный бесконечный поиск");
-        println!("5. 🚪 Выход");
-        println!("\nВведите номер (1-5): ");
+        println!("5. ♾️  Бесконечный многопоточный поиск");
+        println!("6. 🚪 Выход");
+        println!("\nВведите номер (1-6): ");
         
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Не удалось прочитать ввод");
@@ -86,6 +87,29 @@ fn main() {
                 }
             }
             "5" => {
+                println!("\n⚠️  Внимание! Бесконечный многопоточный поиск может работать очень долго!");
+                print!("Вы уверены? (y/N): ");
+                io::stdout().flush().unwrap();
+                let mut confirm = String::new();
+                io::stdin().read_line(&mut confirm).expect("Ошибка чтения");
+                
+                if confirm.trim().to_lowercase() == "y" || confirm.trim().to_lowercase() == "yes" {
+                    // Настройка параметров для бесконечного многопоточного поиска
+                    let available_cores = thread::available_parallelism().map(|p| p.get()).unwrap_or(4);
+                    println!("💻 Доступно логических ядер: {}", available_cores);
+                    
+                    print!("Введите количество потоков (по умолчанию {}): ", available_cores);
+                    io::stdout().flush().unwrap();
+                    let mut threads_input = String::new();
+                    io::stdin().read_line(&mut threads_input).expect("Ошибка чтения");
+                    let num_threads = threads_input.trim().parse().unwrap_or(available_cores);
+                    
+                    find_perfect_numbers_infinite_multithreaded(num_threads);
+                } else {
+                    println!("❌ Отменено.");
+                }
+            }
+            "6" => {
                 println!("👋 До свидания!");
                 break;
             }
@@ -414,5 +438,141 @@ fn test1() {
     println!("Произведение (ожидается Big): {}", product.to_string_value());
     if let DynamicInt::Big(_) = product {
         println!("Произведение действительно стало BigInt!");
+    }
+}
+
+// Функция для бесконечного многопоточного поиска
+fn find_perfect_numbers_infinite_multithreaded(num_threads: usize) {
+    println!("♾️  Начинаем бесконечный многопоточный поиск совершенных чисел...");
+    println!("   🧵 Количество потоков: {}", num_threads);
+    println!("   📦 Размер блока на поток: 1,000,000 чисел");
+    println!("   ⚠️  Нажмите Ctrl+C для остановки\n");
+    
+    let found_count = Arc::new(AtomicUsize::new(0));
+    let checked_count = Arc::new(AtomicUsize::new(0));
+    let current_start = Arc::new(AtomicUsize::new(2)); // Начинаем с 2
+    let (tx, rx) = mpsc::channel();
+    let start_time = Instant::now();
+    
+    // Создаем потоки
+    let mut handles = Vec::new();
+    
+    for thread_id in 0..num_threads {
+        let tx_clone = tx.clone();
+        let found_count_clone = Arc::clone(&found_count);
+        let checked_count_clone = Arc::clone(&checked_count);
+        let current_start_clone = Arc::clone(&current_start);
+        
+        let handle = thread::spawn(move || {
+            infinite_search_thread(
+                thread_id,
+                tx_clone,
+                found_count_clone,
+                checked_count_clone,
+                current_start_clone,
+            );
+        });
+        
+        handles.push(handle);
+    }
+    
+    // Закрываем отправитель в основном потоке
+    drop(tx);
+    
+    // Клонируем Arc для использования в потоке обработки сообщений
+    let found_count_for_msg = Arc::clone(&found_count);
+    let checked_count_for_msg = Arc::clone(&checked_count);
+    
+    // Собираем результаты
+    let msg_handle = thread::spawn(move || {
+        for result in rx {
+            match result {
+                ThreadMessage::PerfectFound { thread_id, number, type_name, check_time, total_checked } => {
+                    let global_found = found_count_for_msg.fetch_add(1, Ordering::SeqCst) + 1;
+                    let elapsed_total = start_time.elapsed();
+                    
+                    println!("🎉 НАЙДЕНО СОВЕРШЕННОЕ ЧИСЛО №{}!", global_found);
+                    println!("   📊 Число: {}", number);
+                    println!("   🔢 Тип: {}", type_name);
+                    println!("   🧵 Поток: #{}", thread_id);
+                    println!("   ⏱️  Время проверки числа: {:.3?}", check_time);
+                    println!("   ⏰ Общее время работы: {:.2?}", elapsed_total);
+                    println!("   📍 Всего проверено: {}\n", total_checked);
+                }
+                ThreadMessage::Progress { thread_id, checked_in_thread } => {
+                    if checked_in_thread % 100000 == 0 {
+                        let total_checked = checked_count_for_msg.load(Ordering::SeqCst);
+                        let elapsed = start_time.elapsed();
+                        let speed = total_checked as f64 / elapsed.as_secs_f64();
+                        println!("🔄 Поток #{}: проверено {} | Всего: {} | Скорость: {:.0}/сек", 
+                            thread_id, checked_in_thread, total_checked, speed);
+                    }
+                }
+            }
+        }
+    });
+    
+    // Ждем завершения всех потоков (никогда не случится в бесконечном поиске)
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    
+    // Ждем завершения потока обработки сообщений
+    msg_handle.join().unwrap();
+}
+
+fn infinite_search_thread(
+    thread_id: usize,
+    tx: mpsc::Sender<ThreadMessage>,
+    _found_count: Arc<AtomicUsize>,
+    checked_count: Arc<AtomicUsize>,
+    current_start: Arc<AtomicUsize>,
+) {
+    let chunk_size = 1000000_i128; // 1 миллион чисел на блок
+    let mut checked_in_thread = 0;
+    
+    loop {
+        // Атомарно получаем следующий диапазон
+        let start = current_start.fetch_add(chunk_size as usize, Ordering::SeqCst) as i128;
+        let end = start + chunk_size;
+        
+        println!("🧵 Поток #{} начинает обработку диапазона {}-{}", thread_id, start, end);
+        
+        let mut current = DynamicInt::new(start);
+        let one = DynamicInt::one();
+        let end_num = DynamicInt::new(end);
+        
+        while current.lt(&end_num) {
+            let check_start = Instant::now();
+            
+            if current.is_perfect() {
+                let check_time = check_start.elapsed();
+                let total_checked = checked_count.load(Ordering::SeqCst);
+                
+                let _ = tx.send(ThreadMessage::PerfectFound {
+                    thread_id,
+                    number: current.to_string_value(),
+                    type_name: current.get_type_name().to_string(),
+                    check_time,
+                    total_checked,
+                });
+            }
+            
+            checked_in_thread += 1;
+            checked_count.fetch_add(1, Ordering::SeqCst);
+            
+            // Отправляем прогресс
+            if checked_in_thread % 50000 == 0 {
+                let _ = tx.send(ThreadMessage::Progress {
+                    thread_id,
+                    checked_in_thread,
+                });
+            }
+            
+            current = current.add(&one);
+        }
+        
+        println!("🏁 Поток #{} завершил диапазон {}-{}, переходит к следующему", 
+            thread_id, start, end);
     }
 }
