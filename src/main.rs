@@ -2,16 +2,255 @@ mod dynamic_int;
 
 use dynamic_int::DynamicInt;
 use std::time::Instant;
+use std::thread;
+use std::sync::{Arc, mpsc};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::io::{self, Write};
 
 fn main() {
     println!("🔢 Поиск совершенных чисел с использованием DynamicInt");
     println!("================================================");
     
-    // Автоматически запускаем тест известных совершенных чисел
-    //test_known_perfect_numbers();
-     find_perfect_numbers();
-    // println!("\n🔍 Теперь попробуем найти следующее совершенное число после 8128...");
-    // search_perfect_numbers_in_range(8129, 50000);
+    loop {
+        println!("\n📋 Выберите режим работы:");
+        println!("1. 🧪 Тест известных совершенных чисел");
+        println!("2. 🔍 Поиск в ограниченном диапазоне");
+        println!("3. 🚀 Многопоточный поиск совершенных чисел");
+        println!("4. 🔄 Однопоточный бесконечный поиск");
+        println!("5. 🚪 Выход");
+        println!("\nВведите номер (1-5): ");
+        
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).expect("Не удалось прочитать ввод");
+        
+        match input.trim() {
+            "1" => {
+                test_known_perfect_numbers();
+            }
+            "2" => {
+                println!("\n📊 Введите диапазон поиска:");
+                
+                print!("Начальное число: ");
+                io::stdout().flush().unwrap();
+                let mut start_input = String::new();
+                io::stdin().read_line(&mut start_input).expect("Ошибка чтения");
+                let start_num: i128 = start_input.trim().parse().unwrap_or(8129);
+                
+                print!("Конечное число: ");
+                io::stdout().flush().unwrap();
+                let mut end_input = String::new();
+                io::stdin().read_line(&mut end_input).expect("Ошибка чтения");
+                let end_num: i128 = end_input.trim().parse().unwrap_or(50000);
+                
+                search_perfect_numbers_in_range(start_num, end_num);
+            }
+            "3" => {
+                println!("\n🧵 Настройка многопоточного поиска:");
+                
+                // Определяем количество логических ядер
+                let available_cores = thread::available_parallelism().map(|p| p.get()).unwrap_or(4);
+                println!("💻 Доступно логических ядер: {}", available_cores);
+                
+                print!("Введите количество потоков (по умолчанию {}): ", available_cores);
+                io::stdout().flush().unwrap();
+                let mut threads_input = String::new();
+                io::stdin().read_line(&mut threads_input).expect("Ошибка чтения");
+                let num_threads = threads_input.trim().parse().unwrap_or(available_cores);
+                
+                print!("Начальное число (по умолчанию 2): ");
+                io::stdout().flush().unwrap();
+                let mut start_input = String::new();
+                io::stdin().read_line(&mut start_input).expect("Ошибка чтения");
+                let start_num: i128 = start_input.trim().parse().unwrap_or(2);
+                
+                print!("Размер блока на поток (по умолчанию 100000): ");
+                io::stdout().flush().unwrap();
+                let mut chunk_input = String::new();
+                io::stdin().read_line(&mut chunk_input).expect("Ошибка чтения");
+                let chunk_size: i128 = chunk_input.trim().parse().unwrap_or(100000);
+                
+                println!("\n🚀 Запускаем многопоточный поиск...");
+                find_perfect_numbers_multithreaded(num_threads, start_num, chunk_size);
+            }
+            "4" => {
+                println!("\n⚠️  Внимание! Бесконечный поиск может работать очень долго!");
+                print!("Вы уверены? (y/N): ");
+                io::stdout().flush().unwrap();
+                let mut confirm = String::new();
+                io::stdin().read_line(&mut confirm).expect("Ошибка чтения");
+                
+                if confirm.trim().to_lowercase() == "y" || confirm.trim().to_lowercase() == "yes" {
+                    find_perfect_numbers();
+                } else {
+                    println!("❌ Отменено.");
+                }
+            }
+            "5" => {
+                println!("👋 До свидания!");
+                break;
+            }
+            _ => {
+                println!("❌ Неверный выбор. Попробуйте снова.");
+            }
+        }
+        
+        println!("\n{}", "=".repeat(50));
+    }
+}
+
+// Новая функция для многопоточного поиска совершенных чисел
+fn find_perfect_numbers_multithreaded(num_threads: usize, start_num: i128, chunk_size: i128) {
+    println!("🚀 Начинаем многопоточный поиск совершенных чисел...");
+    println!("   🧵 Количество потоков: {}", num_threads);
+    println!("   📊 Начальное число: {}", start_num);
+    println!("   📦 Размер блока на поток: {}", chunk_size);
+    println!("   ⚠️  Нажмите Ctrl+C для остановки\n");
+    
+    let found_count = Arc::new(AtomicUsize::new(0));
+    let checked_count = Arc::new(AtomicUsize::new(0));
+    let (tx, rx) = mpsc::channel();
+    let start_time = Instant::now();
+    
+    // Создаем потоки
+    let mut handles = Vec::new();
+    
+    for thread_id in 0..num_threads {
+        let tx_clone = tx.clone();
+        let found_count_clone = Arc::clone(&found_count);
+        let checked_count_clone = Arc::clone(&checked_count);
+        let thread_start = start_num + (thread_id as i128 * chunk_size);
+        let thread_end = thread_start + chunk_size;
+        
+        let handle = thread::spawn(move || {
+            search_in_range_thread(
+                thread_id,
+                thread_start,
+                thread_end,
+                tx_clone,
+                found_count_clone,
+                checked_count_clone,
+            );
+        });
+        
+        handles.push(handle);
+    }
+    
+    // Закрываем отправитель в основном потоке
+    drop(tx);
+    
+    // Клонируем Arc для использования в потоке обработки сообщений
+    let found_count_for_msg = Arc::clone(&found_count);
+    let checked_count_for_msg = Arc::clone(&checked_count);
+    
+    // Собираем результаты
+    let msg_handle = thread::spawn(move || {
+        for result in rx {
+            match result {
+                ThreadMessage::PerfectFound { thread_id, number, type_name, check_time, total_checked } => {
+                    let global_found = found_count_for_msg.fetch_add(1, Ordering::SeqCst) + 1;
+                    let elapsed_total = start_time.elapsed();
+                    
+                    println!("🎉 НАЙДЕНО СОВЕРШЕННОЕ ЧИСЛО №{}!", global_found);
+                    println!("   📊 Число: {}", number);
+                    println!("   🔢 Тип: {}", type_name);
+                    println!("   🧵 Поток: #{}", thread_id);
+                    println!("   ⏱️  Время проверки числа: {:.3?}", check_time);
+                    println!("   ⏰ Общее время работы: {:.2?}", elapsed_total);
+                    println!("   📍 Всего проверено: {}\n", total_checked);
+                }
+                ThreadMessage::Progress { thread_id, checked_in_thread } => {
+                    if checked_in_thread % 50000 == 0 {
+                        let total_checked = checked_count_for_msg.load(Ordering::SeqCst);
+                        let elapsed = start_time.elapsed();
+                        let speed = total_checked as f64 / elapsed.as_secs_f64();
+                        println!("🔄 Поток #{}: проверено {} | Всего: {} | Скорость: {:.0}/сек", 
+                            thread_id, checked_in_thread, total_checked, speed);
+                    }
+                }
+            }
+        }
+    });
+    
+    // Ждем завершения всех потоков
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    
+    // Ждем завершения потока обработки сообщений
+    msg_handle.join().unwrap();
+    
+    let total_time = start_time.elapsed();
+    let total_checked_final = checked_count.load(Ordering::SeqCst);
+    let total_found_final = found_count.load(Ordering::SeqCst);
+    
+    println!("\n📊 Итоговая статистика:");
+    println!("   🧵 Потоков: {}", num_threads);
+    println!("   ✅ Найдено совершенных чисел: {}", total_found_final);
+    println!("   📋 Всего проверено чисел: {}", total_checked_final);
+    println!("   ⏱️  Общее время: {:.2?}", total_time);
+    println!("   ⚡ Общая скорость: {:.0} чисел/сек", total_checked_final as f64 / total_time.as_secs_f64());
+}
+
+#[derive(Debug)]
+enum ThreadMessage {
+    PerfectFound {
+        thread_id: usize,
+        number: String,
+        type_name: String,
+        check_time: std::time::Duration,
+        total_checked: usize,
+    },
+    Progress {
+        thread_id: usize,
+        checked_in_thread: usize,
+    },
+}
+
+fn search_in_range_thread(
+    thread_id: usize,
+    start: i128,
+    end: i128,
+    tx: mpsc::Sender<ThreadMessage>,
+    _found_count: Arc<AtomicUsize>,
+    checked_count: Arc<AtomicUsize>,
+) {
+    let mut current = DynamicInt::new(start);
+    let one = DynamicInt::one();
+    let end_num = DynamicInt::new(end);
+    let mut checked_in_thread = 0;
+    
+    while current.lt(&end_num) {
+        let check_start = Instant::now();
+        
+        if current.is_perfect() {
+            let check_time = check_start.elapsed();
+            let total_checked = checked_count.load(Ordering::SeqCst);
+            
+            let _ = tx.send(ThreadMessage::PerfectFound {
+                thread_id,
+                number: current.to_string_value(),
+                type_name: current.get_type_name().to_string(),
+                check_time,
+                total_checked,
+            });
+        }
+        
+        checked_in_thread += 1;
+        checked_count.fetch_add(1, Ordering::SeqCst);
+        
+        // Отправляем прогресс
+        if checked_in_thread % 10000 == 0 {
+            let _ = tx.send(ThreadMessage::Progress {
+                thread_id,
+                checked_in_thread,
+            });
+        }
+        
+        current = current.add(&one);
+    }
+    
+    println!("🏁 Поток #{} завершен. Проверено {} чисел в диапазоне {}-{}", 
+        thread_id, checked_in_thread, start, end);
 }
 
 fn test_known_perfect_numbers() {
