@@ -35,7 +35,7 @@
 
 ### Установка
 ```bash
-git clone <репозиторий>
+git clone https://github.com/Antony-hash512/BigDigitsTest_ru
 cd bigdigits_test
 cargo build --release
 ```
