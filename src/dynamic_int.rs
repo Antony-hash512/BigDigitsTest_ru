@@ -250,4 +250,84 @@ impl DynamicInt {
             DynamicInt::Big(n) => n.to_string(),
         }
     }
+
+    // Возведение в степень
+    pub fn pow(&self, exponent: u32) -> Self {
+        match self {
+            DynamicInt::Small(base) => {
+                // Для малых степеней пытаемся использовать i128
+                if exponent <= 63 && *base > 0 && *base <= (i128::MAX as f64).powf(1.0 / exponent as f64) as i128 {
+                    if let Some(result) = base.checked_pow(exponent) {
+                        return DynamicInt::Small(result);
+                    }
+                }
+                // Если переполнение, используем BigInt
+                let big_base = base.to_bigint().unwrap();
+                DynamicInt::Big(num_traits::pow(big_base, exponent as usize))
+            }
+            DynamicInt::Big(base) => {
+                DynamicInt::Big(num_traits::pow(base.clone(), exponent as usize))
+            }
+        }
+    }
+
+    // Вычисление 2^x
+    pub fn power_of_two(x: u32) -> Self {
+        let two = DynamicInt::new(2);
+        two.pow(x)
+    }
+
+    // Вычисление числа Мерсенна: 2^x - 1
+    pub fn mersenne_number(x: u32) -> Self {
+        let power_of_two = Self::power_of_two(x);
+        let one = DynamicInt::one();
+        
+        match power_of_two {
+            DynamicInt::Small(n) => DynamicInt::Small(n - 1),
+            DynamicInt::Big(n) => DynamicInt::Big(n - 1),
+        }
+    }
+
+    // Вычисление совершенного числа по формуле Евклида: 2^(x-1) * (2^x - 1)
+    pub fn euclid_perfect_number(x: u32) -> Self {
+        if x < 2 {
+            return DynamicInt::new(0); // Не может быть совершенным для x < 2
+        }
+        
+        let mersenne = Self::mersenne_number(x);
+        let power_factor = Self::power_of_two(x - 1);
+        
+        mersenne.mul(&power_factor)
+    }
+
+    // Проверка, является ли число Мерсенна простым
+    pub fn is_mersenne_prime(x: u32) -> bool {
+        let mersenne = Self::mersenne_number(x);
+        mersenne.is_prime()
+    }
+
+    // Вычитание
+    pub fn sub(&self, other: &DynamicInt) -> Self {
+        match (self, other) {
+            (DynamicInt::Small(a), DynamicInt::Small(b)) => {
+                let (result, overflow) = a.overflowing_sub(*b);
+                if overflow {
+                    let big_a = a.to_bigint().unwrap();
+                    let big_b = b.to_bigint().unwrap();
+                    DynamicInt::Big(big_a - big_b)
+                } else {
+                    DynamicInt::Small(result)
+                }
+            }
+            (DynamicInt::Big(a), DynamicInt::Small(b)) => {
+                DynamicInt::Big(a - b.to_bigint().unwrap())
+            }
+            (DynamicInt::Small(a), DynamicInt::Big(b)) => {
+                DynamicInt::Big(a.to_bigint().unwrap() - b)
+            }
+            (DynamicInt::Big(a), DynamicInt::Big(b)) => {
+                DynamicInt::Big(a - b)
+            }
+        }
+    }
 } 

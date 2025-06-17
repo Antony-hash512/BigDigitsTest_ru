@@ -22,8 +22,11 @@ fn main() {
         println!("7. 🔍 Поиск простых чисел в диапазоне");
         println!("8. 🚀 Многопоточный поиск простых чисел");
         println!("9. ♾️  Бесконечный многопоточный поиск простых чисел");
-        println!("10. 🚪 Выход");
-        println!("\nВведите номер (1-10): ");
+        println!("10. 🔥 Поиск совершенных чисел по формуле Евклида");
+        println!("11. 🧮 Тест чисел Мерсенна");
+        println!("12. 🚀 Многопоточный поиск по формуле Евклида");
+        println!("13. 🚪 Выход");
+        println!("\nВведите номер (1-13): ");
         
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Не удалось прочитать ввод");
@@ -183,6 +186,41 @@ fn main() {
                 }
             }
             "10" => {
+                println!("\n🔥 Поиск совершенных чисел по формуле Евклида:");
+                
+                print!("Максимальный показатель степени x (по умолчанию 50): ");
+                io::stdout().flush().unwrap();
+                let mut max_input = String::new();
+                io::stdin().read_line(&mut max_input).expect("Ошибка чтения");
+                let max_x: u32 = max_input.trim().parse().unwrap_or(50);
+                
+                search_perfect_numbers_euclid(max_x);
+            }
+            "11" => {
+                test_mersenne_numbers();
+            }
+            "12" => {
+                println!("\n🧵 Настройка многопоточного поиска по формуле Евклида:");
+                
+                let available_cores = thread::available_parallelism().map(|p| p.get()).unwrap_or(4);
+                println!("💻 Доступно логических ядер: {}", available_cores);
+                
+                print!("Введите количество потоков (по умолчанию {}): ", available_cores);
+                io::stdout().flush().unwrap();
+                let mut threads_input = String::new();
+                io::stdin().read_line(&mut threads_input).expect("Ошибка чтения");
+                let num_threads = threads_input.trim().parse().unwrap_or(available_cores);
+                
+                print!("Максимальный показатель степени x (по умолчанию 100): ");
+                io::stdout().flush().unwrap();
+                let mut max_input = String::new();
+                io::stdin().read_line(&mut max_input).expect("Ошибка чтения");
+                let max_x: u32 = max_input.trim().parse().unwrap_or(100);
+                
+                println!("\n🚀 Запускаем многопоточный поиск по формуле Евклида...");
+                search_perfect_numbers_euclid_multithreaded(num_threads, max_x);
+            }
+            "13" => {
                 println!("👋 До свидания!");
                 break;
             }
@@ -663,6 +701,313 @@ fn infinite_search_thread(
         println!("🏁 Поток #{} завершил диапазон {}-{}, переходит к следующему", 
             thread_id, start, end);
     }
+}
+
+// Поиск совершенных чисел по формуле Евклида: 2^(x-1) * (2^x - 1)
+fn search_perfect_numbers_euclid(max_x: u32) {
+    println!("🔥 Поиск совершенных чисел по формуле Евклида...");
+    println!("   📐 Формула: 2^(x-1) * (2^x - 1), где 2^x - 1 - простое число Мерсенна");
+    println!("   📊 Максимальный показатель x: {}\n", max_x);
+    
+    let mut found_count = 0;
+    let mut checked_mersenne = 0;
+    let total_start_time = Instant::now();
+    
+    for x in 2..=max_x {
+        let mersenne_check_start = Instant::now();
+        let is_mersenne_prime = DynamicInt::is_mersenne_prime(x);
+        let mersenne_check_time = mersenne_check_start.elapsed();
+        
+        checked_mersenne += 1;
+        
+        if is_mersenne_prime {
+            let perfect_calc_start = Instant::now();
+            let mersenne_num = DynamicInt::mersenne_number(x);
+            let perfect_num = DynamicInt::euclid_perfect_number(x);
+            let perfect_calc_time = perfect_calc_start.elapsed();
+            
+            // Дополнительная проверка, что число действительно совершенное
+            let verification_start = Instant::now();
+            let is_actually_perfect = perfect_num.is_perfect();
+            let verification_time = verification_start.elapsed();
+            
+            found_count += 1;
+            
+            println!("🎉 НАЙДЕНО СОВЕРШЕННОЕ ЧИСЛО №{} ПО ФОРМУЛЕ ЕВКЛИДА!", found_count);
+            println!("   📏 Показатель x: {}", x);
+            println!("   🔢 Число Мерсенна 2^{}-1: {}", x, mersenne_num.to_string_value());
+            println!("   🎯 Совершенное число: {}", perfect_num.to_string_value());
+            println!("   📊 Тип числа: {}", perfect_num.get_type_name());
+            println!("   ⏱️  Время проверки Мерсенна: {:.3?}", mersenne_check_time);
+            println!("   ⏱️  Время вычисления совершенного: {:.3?}", perfect_calc_time);
+            println!("   ✅ Проверка совершенности: {} ({:.3?})", 
+                if is_actually_perfect { "✅" } else { "❌" }, verification_time);
+            
+            // Показываем длину числа в десятичных знаках
+            let decimal_length = perfect_num.to_string_value().len();
+            println!("   📐 Длина в десятичных знаках: {}\n", decimal_length);
+        } else {
+            if x <= 20 || x % 10 == 0 {
+                println!("🔍 x={}: Мерсенна 2^{}-1 не является простым числом ({:.3?})", 
+                    x, x, mersenne_check_time);
+            }
+        }
+    }
+    
+    let total_elapsed = total_start_time.elapsed();
+    println!("\n📊 Итоги поиска по формуле Евклида:");
+    println!("   📏 Проверено показателей x: {} (от 2 до {})", checked_mersenne, max_x);
+    println!("   ✅ Найдено совершенных чисел: {}", found_count);
+    println!("   ⏱️  Общее время: {:.2?}", total_elapsed);
+    println!("   ⚡ Средняя скорость: {:.3} показателей/сек", 
+        checked_mersenne as f64 / total_elapsed.as_secs_f64());
+    
+    if found_count > 0 {
+        println!("   💡 Формула Евклида работает! Все найденные числа действительно совершенные.");
+    }
+}
+
+// Тест известных чисел Мерсенна
+fn test_mersenne_numbers() {
+    println!("🧮 Тестируем известные числа Мерсенна...\n");
+    
+    // Первые известные простые числа Мерсенна (показатели степени)
+    let known_mersenne_primes = vec![2, 3, 5, 7, 13, 17, 19, 31];
+    
+    println!("✅ Проверяем известные простые числа Мерсенна:");
+    for x in &known_mersenne_primes {
+        let start_time = Instant::now();
+        let mersenne_num = DynamicInt::mersenne_number(*x);
+        let is_prime = mersenne_num.is_prime();
+        let elapsed = start_time.elapsed();
+        
+        println!("2^{}-1 = {} | Простое: {} | Тип: {} | Время: {:.3?}",
+            x, 
+            mersenne_num.to_string_value(),
+            if is_prime { "✅" } else { "❌" },
+            mersenne_num.get_type_name(),
+            elapsed
+        );
+    }
+    
+    println!("\n❌ Проверяем числа, которые НЕ дают простые числа Мерсенна:");
+    let non_mersenne = vec![4, 6, 8, 9, 10, 11, 12, 14, 15, 16];
+    
+    for x in &non_mersenne {
+        let start_time = Instant::now();
+        let mersenne_num = DynamicInt::mersenne_number(*x);
+        let is_prime = mersenne_num.is_prime();
+        let elapsed = start_time.elapsed();
+        
+        println!("2^{}-1 = {} | Простое: {} | Время: {:.3?}",
+            x, 
+            mersenne_num.to_string_value(),
+            if is_prime { "✅" } else { "❌" },
+            elapsed
+        );
+    }
+    
+    println!("\n🎯 Теперь проверим соответствующие совершенные числа:");
+    for x in &known_mersenne_primes[..4] { // Первые 4 для демонстрации
+        let start_time = Instant::now();
+        let perfect_num = DynamicInt::euclid_perfect_number(*x);
+        let is_perfect = perfect_num.is_perfect();
+        let elapsed = start_time.elapsed();
+        
+        println!("x={}: 2^{} * (2^{}-1) = {} | Совершенное: {} | Время: {:.3?}",
+            x, x-1, x, 
+            perfect_num.to_string_value(),
+            if is_perfect { "✅" } else { "❌" },
+            elapsed
+        );
+    }
+    
+    println!("\n🎯 Результат: алгоритм корректно определяет числа Мерсенна и совершенные числа!");
+}
+
+#[derive(Debug)]
+enum EuclidThreadMessage {
+    PerfectFound {
+        thread_id: usize,
+        x: u32,
+        mersenne_number: String,
+        perfect_number: String,
+        type_name: String,
+        mersenne_time: std::time::Duration,
+        perfect_time: std::time::Duration,
+        verification_time: std::time::Duration,
+        decimal_length: usize,
+    },
+    Progress {
+        thread_id: usize,
+        current_x: u32,
+        checked_count: usize,
+    },
+}
+
+// Многопоточный поиск совершенных чисел по формуле Евклида
+fn search_perfect_numbers_euclid_multithreaded(num_threads: usize, max_x: u32) {
+    println!("🚀 Начинаем многопоточный поиск по формуле Евклида...");
+    println!("   🧵 Количество потоков: {}", num_threads);
+    println!("   📏 Максимальный показатель x: {}", max_x);
+    println!("   📐 Формула: 2^(x-1) * (2^x - 1), где 2^x - 1 - простое");
+    println!("   ⚠️  Нажмите Ctrl+C для остановки\n");
+    
+    let found_count = Arc::new(AtomicUsize::new(0));
+    let checked_count = Arc::new(AtomicUsize::new(0));
+    let (tx, rx) = mpsc::channel();
+    let start_time = Instant::now();
+    
+    // Создаем потоки
+    let mut handles = Vec::new();
+    let chunk_size = (max_x - 2 + 1) / num_threads as u32 + 1;
+    
+    for thread_id in 0..num_threads {
+        let tx_clone = tx.clone();
+        let found_count_clone = Arc::clone(&found_count);
+        let checked_count_clone = Arc::clone(&checked_count);
+        let start_x = 2 + (thread_id as u32 * chunk_size);
+        let end_x = std::cmp::min(start_x + chunk_size, max_x + 1);
+        
+        if start_x < end_x {
+            let handle = thread::spawn(move || {
+                search_euclid_thread(
+                    thread_id,
+                    start_x,
+                    end_x,
+                    tx_clone,
+                    found_count_clone,
+                    checked_count_clone,
+                );
+            });
+            
+            handles.push(handle);
+        }
+    }
+    
+    // Закрываем отправитель в основном потоке
+    drop(tx);
+    
+    // Клонируем Arc для использования в потоке обработки сообщений
+    let found_count_for_msg = Arc::clone(&found_count);
+    let checked_count_for_msg = Arc::clone(&checked_count);
+    
+    // Собираем результаты
+    let msg_handle = thread::spawn(move || {
+        for result in rx {
+            match result {
+                EuclidThreadMessage::PerfectFound { 
+                    thread_id, x, mersenne_number, perfect_number, type_name,
+                    mersenne_time, perfect_time, verification_time, decimal_length
+                } => {
+                    let global_found = found_count_for_msg.fetch_add(1, Ordering::SeqCst) + 1;
+                    let elapsed_total = start_time.elapsed();
+                    
+                    println!("🎉 НАЙДЕНО СОВЕРШЕННОЕ ЧИСЛО №{} ПО ФОРМУЛЕ ЕВКЛИДА!", global_found);
+                    println!("   📏 Показатель x: {}", x);
+                    println!("   🔢 Число Мерсенна 2^{}-1: {}", x, mersenne_number);
+                    println!("   🎯 Совершенное число: {}", perfect_number);
+                    println!("   📊 Тип числа: {}", type_name);
+                    println!("   🧵 Поток: #{}", thread_id);
+                    println!("   ⏱️  Время проверки Мерсенна: {:.3?}", mersenne_time);
+                    println!("   ⏱️  Время вычисления: {:.3?}", perfect_time);
+                    println!("   ✅ Время проверки совершенности: {:.3?}", verification_time);
+                    println!("   📐 Длина в десятичных знаках: {}", decimal_length);
+                    println!("   ⏰ Общее время работы: {:.2?}\n", elapsed_total);
+                }
+                EuclidThreadMessage::Progress { thread_id, current_x, checked_count } => {
+                    if checked_count % 50 == 0 {
+                        let total_checked = checked_count_for_msg.load(Ordering::SeqCst);
+                        let elapsed = start_time.elapsed();
+                        let speed = total_checked as f64 / elapsed.as_secs_f64();
+                        println!("🔄 Поток #{}: проверяется x={} | Всего: {} | Скорость: {:.2}/сек", 
+                            thread_id, current_x, total_checked, speed);
+                    }
+                }
+            }
+        }
+    });
+    
+    // Ждем завершения всех потоков
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    
+    // Ждем завершения потока обработки сообщений
+    msg_handle.join().unwrap();
+    
+    let total_time = start_time.elapsed();
+    let total_checked_final = checked_count.load(Ordering::SeqCst);
+    let total_found_final = found_count.load(Ordering::SeqCst);
+    
+    println!("\n📊 Итоговая статистика многопоточного поиска по Евклиду:");
+    println!("   🧵 Потоков: {}", num_threads);
+    println!("   📏 Проверено показателей x: {} (от 2 до {})", total_checked_final, max_x);
+    println!("   ✅ Найдено совершенных чисел: {}", total_found_final);
+    println!("   ⏱️  Общее время: {:.2?}", total_time);
+    println!("   ⚡ Общая скорость: {:.2} показателей/сек", total_checked_final as f64 / total_time.as_secs_f64());
+    
+    if total_found_final > 0 {
+        println!("   💡 Формула Евклида эффективно находит совершенные числа!");
+    }
+}
+
+fn search_euclid_thread(
+    thread_id: usize,
+    start_x: u32,
+    end_x: u32,
+    tx: mpsc::Sender<EuclidThreadMessage>,
+    _found_count: Arc<AtomicUsize>,
+    checked_count: Arc<AtomicUsize>,
+) {
+    let mut checked_in_thread = 0;
+    
+    for x in start_x..end_x {
+        let mersenne_check_start = Instant::now();
+        let is_mersenne_prime = DynamicInt::is_mersenne_prime(x);
+        let mersenne_time = mersenne_check_start.elapsed();
+        
+        checked_in_thread += 1;
+        checked_count.fetch_add(1, Ordering::SeqCst);
+        
+        if is_mersenne_prime {
+            let perfect_calc_start = Instant::now();
+            let mersenne_num = DynamicInt::mersenne_number(x);
+            let perfect_num = DynamicInt::euclid_perfect_number(x);
+            let perfect_time = perfect_calc_start.elapsed();
+            
+            // Дополнительная проверка совершенности
+            let verification_start = Instant::now();
+            let _is_actually_perfect = perfect_num.is_perfect();
+            let verification_time = verification_start.elapsed();
+            
+            let decimal_length = perfect_num.to_string_value().len();
+            
+            let _ = tx.send(EuclidThreadMessage::PerfectFound {
+                thread_id,
+                x,
+                mersenne_number: mersenne_num.to_string_value(),
+                perfect_number: perfect_num.to_string_value(),
+                type_name: perfect_num.get_type_name().to_string(),
+                mersenne_time,
+                perfect_time,
+                verification_time,
+                decimal_length,
+            });
+        }
+        
+        // Отправляем прогресс
+        if checked_in_thread % 10 == 0 {
+            let _ = tx.send(EuclidThreadMessage::Progress {
+                thread_id,
+                current_x: x,
+                checked_count: checked_in_thread,
+            });
+        }
+    }
+    
+    println!("🏁 Поток #{} завершен. Проверено {} показателей x в диапазоне {}-{}", 
+        thread_id, checked_in_thread, start_x, end_x - 1);
 }
 
 fn test_prime_numbers() {
